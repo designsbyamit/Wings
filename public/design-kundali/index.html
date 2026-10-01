@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#11110f">
+<title>Design Kundali | Wingspan</title>
+<style>
+:root{
+  --ink:#171714;--paper:#f3eee2;--paper2:#ebe3d2;--red:#a52a24;--gold:#b78b43;
+  --muted:#716b5e;--line:#bdb3a0;--white:#fffaf0;--green:#6e7d4b;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#11110f}
+body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink)}
+button,input{font:inherit}
+button{cursor:pointer}
+.kd{min-height:100svh;background:var(--paper);overflow:hidden;position:relative}
+.screen{min-height:100svh;width:100%;display:flex;flex-direction:column;position:relative}
+.hidden{display:none!important}
+.top{padding:22px 20px 0;display:flex;justify-content:space-between;align-items:center}
+.wordmark{font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:800}
+.step{font-size:10px;color:var(--muted);letter-spacing:.08em}
+.content{width:min(100%,520px);margin:auto;padding:30px 24px 34px}
+.center{text-align:center}
+.kicker{text-transform:uppercase;letter-spacing:.18em;font-size:10px;font-weight:800;color:var(--red)}
+h1,h2,h3,p{margin-top:0}
+h1{font-family:Georgia,serif;font-weight:500;font-size:clamp(42px,12vw,72px);line-height:.92;letter-spacing:-.055em;margin:14px 0}
+h2{font-family:Georgia,serif;font-weight:500;font-size:clamp(32px,9vw,52px);line-height:.98;letter-spacing:-.045em}
+.lede{font-size:15px;line-height:1.55;color:#595448;max-width:390px;margin:0 auto}
+.cta{margin-top:28px;border:0;background:var(--ink);color:#fffaf0;border-radius:999px;padding:15px 22px;font-weight:750;font-size:13px;letter-spacing:.01em}
+.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:13px 18px;font-size:12px}
+.back{position:absolute;left:20px;top:21px;border:0;background:transparent;color:var(--muted);font-size:18px;padding:0}
+.field-wrap{margin-top:32px}
+.label{display:block;text-transform:uppercase;letter-spacing:.14em;font-size:9px;font-weight:800;color:var(--muted);margin-bottom:9px}
+.field{width:100%;border:0;border-bottom:2px solid var(--ink);background:transparent;padding:10px 0 12px;font-size:22px;outline:none;color:var(--ink);border-radius:0}
+.field::placeholder{color:#aaa18f}
+.next-row{margin-top:28px;display:flex;justify-content:flex-end}
+.next{border:0;background:var(--ink);color:var(--white);width:52px;height:52px;border-radius:50%;font-size:20px}
+.date{font-size:22px}
+.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:30px}
+.choice{min-height:150px;border:1px solid var(--line);background:rgba(255,250,240,.42);border-radius:18px;padding:18px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;transition:.2s}
+.choice:hover{transform:translateY(-2px);border-color:var(--ink)}
+.choice .arrow{font-size:25px;align-self:flex-end}
+.choice strong{font-family:Georgia,serif;font-size:22px;font-weight:500}
+.choice small{font-size:10px;color:var(--muted);line-height:1.35;margin-top:5px}
+.yes{background:var(--ink);color:var(--white);border-color:var(--ink)}
+.yes small{color:#c8c0b1}
+.no{background:var(--paper2)}
+.kundali-wrap{width:min(86vw,390px);aspect-ratio:1;margin:24px auto 0;position:relative}
+.kundali{position:absolute;inset:0;border:2px solid var(--ink);background:#eadfca;transform:rotate(45deg);overflow:hidden}
+.kundali:before,.kundali:after{content:"";position:absolute;inset:12%;border:1px solid var(--ink)}
+.kundali:after{inset:25%;transform:rotate(45deg)}
+.k-line{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--ink);transform:translateX(-50%)}
+.k-line2{position:absolute;top:50%;left:0;right:0;height:1px;background:var(--ink);transform:translateY(-50%)}
+.planet{position:absolute;font-family:Georgia,serif;font-size:22px;transform:rotate(-45deg)}
+.p1{left:13%;top:14%}.p2{right:14%;top:15%}.p3{left:11%;bottom:16%}.p4{right:12%;bottom:16%}.p5{left:44%;top:8%}.p6{left:43%;bottom:7%}
+.k-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-45deg);text-align:center;font-family:Georgia,serif}
+.k-center b{font-size:18px}.k-center span{display:block;font:700 8px Inter,sans-serif;letter-spacing:.16em;margin-top:3px}
+.zodiac{position:absolute;font-size:12px;opacity:.7;transform:rotate(-45deg)}
+.z1{left:8%;top:48%}.z2{right:8%;top:47%}.z3{left:48%;top:1%}.z4{left:47%;bottom:1%}
+.loader-orbit{width:120px;height:120px;margin:35px auto;border:1px solid var(--line);border-radius:50%;position:relative}
+.loader-orbit:before{content:"";position:absolute;inset:18px;border:1px dashed var(--gold);border-radius:50%;animation:spin 5s linear infinite}
+.loader-orbit i{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--red);top:-4px;left:calc(50% - 4px);transform-origin:4px 64px;animation:spin 2s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.progress{height:3px;background:#d9d0bf;margin-top:20px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--red);width:0;transition:width .5s}
+.report-shell{padding:18px 15px 30px}
+.report{background:#eadfca;border:1px solid #a99e8b;max-width:520px;margin:auto;box-shadow:0 14px 45px #211d161c}
+.report-head{padding:22px 18px 15px;border-bottom:1px solid #a99e8b;text-align:center}
+.report-head h2{font-size:30px;margin:5px 0 3px}
+.report-head p{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:#756c5d;margin:0}
+.fake-note{margin:13px 15px 0;padding:8px 10px;background:#e0d3b9;border:1px dashed #9c8e76;text-align:center;font-size:9px;letter-spacing:.06em;text-transform:uppercase}
+.prediction{padding:20px}
+.prediction .headline{font-family:Georgia,serif;font-size:28px;line-height:1.05;margin-bottom:14px}
+.prediction p{font-family:Georgia,serif;font-size:15px;line-height:1.55;color:#4f493e}
+.prediction-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:18px}
+.pred-cell{border:1px solid #b5a991;padding:10px}
+.pred-cell span{display:block;font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:#786e5e}.pred-cell b{font-family:Georgia,serif;font-size:17px;font-weight:500;display:block;margin-top:4px}
+.reaction{padding:25px 18px 30px;text-align:center}
+.reaction h3{font-family:Georgia,serif;font-size:27px;font-weight:500;margin-bottom:7px}
+.reaction p{font-size:12px;color:#696255;margin-bottom:18px}
+.react-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.react{border:1px solid #aaa08e;background:#f4eddf;border-radius:14px;padding:16px 10px;font-weight:750}
+.react.good{background:var(--ink);color:var(--white);border-color:var(--ink)}
+.reveal{padding:30px 20px;text-align:center}
+.reveal h2{font-size:45px}
+.lucky{font-family:Georgia,serif;font-size:21px;line-height:1.35}
+.upload-zone{border:1.5px dashed #a79d8b;background:#eee5d5;border-radius:18px;padding:28px 18px;text-align:center;margin-top:22px}
+.upload-icon{font-size:34px;margin-bottom:7px}.upload-zone strong{font-family:Georgia,serif;font-size:20px;font-weight:500}.upload-zone p{font-size:10px;color:var(--muted);line-height:1.4;margin:7px auto 14px}
+.file-label{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:var(--ink);color:var(--white);padding:12px 17px;font-size:11px;font-weight:750}
+input[type=file]{display:none}
+.file-name{font-size:10px;color:var(--green);margin-top:10px;min-height:14px}
+.real-report .report-head{padding-bottom:12px}
+.identity{display:flex;justify-content:space-between;align-items:end;gap:12px;padding:12px 17px;border-bottom:1px solid #a99e8b}
+.identity b{font-family:Georgia,serif;font-size:18px;font-weight:500}.identity span{font-size:9px;color:#766d60}
+.axis{padding:15px 17px;border-bottom:1px solid #a99e8b}
+.axis-title{font-size:9px;text-transform:uppercase;letter-spacing:.13em;font-weight:800;margin-bottom:10px}
+.bars{display:grid;gap:8px}
+.bar-row{display:grid;grid-template-columns:82px 1fr 25px;gap:8px;align-items:center;font-size:9px}
+.track{height:6px;background:#d5c9b3;border-radius:99px;overflow:hidden}.fill{height:100%;background:var(--red)}
+.houses{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:15px 17px;border-bottom:1px solid #a99e8b}
+.house{border:1px solid #b7aa95;padding:10px;min-height:70px}.house span{font-size:8px;color:#786f60;text-transform:uppercase;letter-spacing:.08em}.house b{font-family:Georgia,serif;font-size:16px;font-weight:500;display:block;margin-top:4px}
+.reading{padding:18px 17px}.reading h4{font-family:Georgia,serif;font-size:21px;font-weight:500;margin:0 0 6px}.reading p{font-size:11px;line-height:1.5;color:#5b5448;margin-bottom:16px}.tag{display:inline-block;padding:6px 8px;border:1px solid #ad9f89;font-size:8px;text-transform:uppercase;letter-spacing:.08em;margin:2px}
+.final-cta{padding:25px 18px 30px;text-align:center;background:#ded2bb;border-top:1px solid #a99e8b}
+.final-cta h3{font-family:Georgia,serif;font-size:28px;font-weight:500;margin-bottom:7px}
+.final-cta p{font-size:11px;line-height:1.45;color:#5f584d;max-width:320px;margin:0 auto}
+.final-cta .cta{margin-top:16px}
+.footer-note{font-size:9px;color:#8b8375;text-align:center;margin:14px auto 0;max-width:360px;line-height:1.45}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#171714;color:#fffaf0;border-radius:999px;padding:9px 13px;font-size:10px;z-index:20;box-shadow:0 8px 24px #0004}
+@media(min-width:700px){.content{padding-top:50px}.screen{min-height:720px}.report-shell{padding-top:28px}}
+</style>
+</head>
+<body>
+<div class="kd" id="app">
+
+<section class="screen" id="s0">
+  <div class="top"><span class="wordmark">Wingspan</span><span class="step">01 / 10</span></div>
+  <div class="content center">
+    <div class="kundali-wrap">
+      <div class="kundali">
+        <div class="k-line"></div><div class="k-line2"></div>
+        <span class="planet p1">☉</span><span class="planet p2">☽</span><span class="planet p3">♃</span><span class="planet p4">♄</span><span class="planet p5">♂</span><span class="planet p6">♀</span>
+        <span class="zodiac z1">♈</span><span class="zodiac z2">♎</span><span class="zodiac z3">♌</span><span class="zodiac z4">♓</span>
+        <div class="k-center"><b>ॐ</b><span>DESIGN KUNDALI</span></div>
+      </div>
+    </div>
+    <div class="kicker">A little career fortune-telling experiment</div>
+    <h1>Create your<br>Design Kundali</h1>
+    <p class="lede">Let's see what the stars say about your design future.</p>
+    <button class="cta" onclick="go(1)">Let's begin →</button>
+  </div>
+</section>
+
+<section class="screen hidden" id="s1">
+  <button class="back" onclick="go(0)">←</button><div class="top"><span class="wordmark">Design Kundali</span><span class="step">02 / 10</span></div>
+  <div class="content">
+    <div class="kicker">First things first</div><h2>What should<br>we call you?</h2>
+    <div class="field-wrap"><label class="label">Your name</label><input id="name" class="field" placeholder="e.g. Amit" autocomplete="name"></div>
+    <div class="next-row"><button class="next" onclick="nextName()">→</button></div>
+  </div>
+</section>
+
+<section class="screen hidden" id="s2">
+  <button class="back" onclick="go(1)">←</button><div class="top"><span class="wordmark">Design Kundali</span><span class="step">03 / 10</span></div>
+  <div class="content">
+    <div class="kicker">The place</div><h2>Where did<br>your story begin?</h2>
+    <div class="field-wrap"><label class="label">Place of birth</label><input id="place" class="field" placeholder="e.g. Bengaluru" autocomplete="address-level2"></div>
+    <div class="next-row"><button class="next" onclick="nextPlace()">→</button></div>
+  </div>
+</section>
+
+<section class="screen hidden" id="s3">
+  <button class="back" onclick="go(2)">←</button><div class="top"><span class="wordmark">Design Kundali</span><span class="step">04 / 10</span></div>
+  <div class="content">
+    <div class="kicker">The moment</div><h2>And when did<br>it all begin?</h2>
+    <div class="field-wrap"><label class="label">Date of birth</label><input id="dob" type="date" class="field date"></div>
+    <div class="next-row"><button class="next" onclick="nextDob()">→</button></div>
+  </div>
+</section>
+
+<section class="screen hidden" id="s4">
+  <div class="top"><span class="wordmark">Design Kundali</span><span class="step">05 / 10</span></div>
+  <div class="content center">
+    <div class="kundali-wrap" style="width:min(58vw,260px)">
+      <div class="kundali">
+        <div class="k-line"></div><div class="k-line2"></div>
+        <span class="planet p1">☉</span><span class="planet p2">☽</span><span class="planet p3">♃</span><span class="planet p4">♄</span><span class="planet p5">♂</span><span class="planet p6">♀</span>
+        <div class="k-center"><b>✦</b><span>CALCULATING</span></div>
+      </div>
+    </div>
+    <h2 style="font-size:35px">Reading the stars...</h2>
+    <p class="lede" id="loadline">Mapping planets, houses and creative forces.</p>
+    <div class="progress"><i id="loadbar"></i></div>
+  </div>
+</section>
+
+<section class="screen hidden" id="s5">
+  <div class="top"><span class="wordmark">One question</span><span class="step">06 / 10</span></div>
+  <div class="content center">
+    <div class="kicker">Be honest</div>
+    <h2>Do you still<br>believe in this?</h2>
+    <p class="lede">No judgement. We're genuinely curious.</p>
+    <div class="choice-grid">
+      <button class="choice yes" onclick="chooseBelief(true)"><span class="arrow">↗</span><strong>Yes, I do.</strong><small>Show me what my stars say.</small></button>
+      <button class="choice no" onclick="chooseBelief(false)"><span class="arrow">↘</span><strong>No, I don't.</strong><small>Let's look at something real.</small></button>
+    </div>
+  </div>
+</section>
+
+<section class="screen hidden" id="s6">
+  <div class="top"><span class="wordmark">Your prediction</span><span class="step">07 / 10</span></div>
+  <div class="report-shell">
+    <div class="report">
+      <div class="report-head"><p>Career horoscope</p><h2 id="fake-title">Your Design Kundali</h2><p id="fake-meta">A reading for you</p></div>
+      <div class="fake-note">A playful prediction · not based on your career</div>
+      <div class="prediction">
+        <div class="headline">A career of reinvention awaits.</div>
+        <p>You are naturally drawn towards solving complex problems. Your path may move through periods of reinvention, with your influence growing beyond your immediate craft.</p>
+        <div class="prediction-grid">
+          <div class="pred-cell"><span>Career planet</span><b>Jupiter</b></div>
+          <div class="pred-cell"><span>Creative house</span><b>7th</b></div>
+          <div class="pred-cell"><span>Rising influence</span><b>Leadership</b></div>
+          <div class="pred-cell"><span>Design element</span><b>Air</b></div>
+        </div>
+      </div>
+      <div class="reaction">
+        <h3>How much did this feel like you?</h3>
+        <p>Don't overthink it.</p>
+        <div class="react-buttons">
+          <button class="react good" onclick="fakeReaction(true)">✓ That's me</button>
+          <button class="react" onclick="fakeReaction(false)">✕ Not really</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="screen hidden" id="s7">
+  <div class="top"><span class="wordmark">The reveal</span><span class="step">08 / 10</span></div>
+  <div class="content center">
+    <div class="kicker">Plot twist</div>
+    <h2>Whoa.<br>You got lucky. 😄</h2>
+    <p class="lucky">That prediction wasn't based on your career at all. It was generated without looking at your experience, projects, skills or work.</p>
+    <p class="lede" style="margin-top:18px">So here's the real question.</p>
+    <h3 style="font-family:Georgia,serif;font-size:26px;font-weight:500;margin:10px 0 0">Do you want to progress with your <i>luck</i> or your <i>hard work</i>?</h3>
+    <div class="choice-grid">
+      <button class="choice no" onclick="luckEnd()"><span class="arrow">✦</span><strong>My luck</strong><small>May the planets be with me.</small></button>
+      <button class="choice yes" onclick="showUpload('hardwork')"><span class="arrow">↗</span><strong>My hard work</strong><small>Let's look at what I've actually built.</small></button>
+    </div>
+  </div>
+</section>
+
+<section class="screen hidden" id="s8">
+  <div class="top"><span class="wordmark">The evidence</span><span class="step">09 / 10</span></div>
+  <div class="content">
+    <div class="kicker" id="upload-kicker">Fair enough.</div>
+    <h2 id="upload-title">Let's look at<br>what you've built.</h2>
+    <p class="lede" id="upload-copy">Skip the stars. Give me your career story and I'll create a Design Kundali from what you've actually done.</p>
+    <div class="upload-zone">
+      <div class="upload-icon">↥</div><strong>Upload your resume</strong>
+      <p>PDF, DOC or DOCX. For this prototype, your file stays in your browser.</p>
+      <label class="file-label">Choose file<input id="resume" type="file" accept=".pdf,.doc,.docx" onchange="resumePicked(this)"></label>
+      <div class="file-name" id="filename"></div>
+    </div>
+    <button class="cta" id="generate" style="width:100%;opacity:.45" disabled onclick="generateReal()">Read my career →</button>
+    <p class="footer-note">Your Design Kundali is exploratory, not a promise about your future.</p>
+  </div>
+</section>
+
+<section class="screen hidden" id="s9">
+  <div class="top"><span class="wordmark">Your real reading</span><span class="step">10 / 10</span></div>
+  <div class="report-shell real-report">
+    <div class="report">
+      <div class="report-head"><p>Evidence-based career reading</p><h2>Design Kundali</h2><p id="real-meta">Built from your career story</p></div>
+      <div class="identity"><div><b id="real-name">Your career</b><br><span id="real-file">Resume</span></div><span>WINGSPAN · 2026</span></div>
+      <div class="axis"><div class="axis-title">Career planets</div><div class="bars">
+        <div class="bar-row"><span>Craft</span><div class="track"><div class="fill" style="width:86%"></div></div><b>86</b></div>
+        <div class="bar-row"><span>Strategy</span><div class="track"><div class="fill" style="width:78%"></div></div><b>78</b></div>
+        <div class="bar-row"><span>Influence</span><div class="track"><div class="fill" style="width:82%"></div></div><b>82</b></div>
+        <div class="bar-row"><span>Technology</span><div class="track"><div class="fill" style="width:69%"></div></div><b>69</b></div>
+        <div class="bar-row"><span>AI</span><div class="track"><div class="fill" style="width:61%"></div></div><b>61</b></div>
+        <div class="bar-row"><span>Business</span><div class="track"><div class="fill" style="width:54%"></div></div><b>54</b></div>
+      </div></div>
+      <div class="houses">
+        <div class="house"><span>Strongest house</span><b>Influence</b></div>
+        <div class="house"><span>Emerging house</span><b>AI</b></div>
+        <div class="house"><span>Career tension</span><b>Craft × Scale</b></div>
+        <div class="house"><span>Open house</span><b>Business</b></div>
+      </div>
+      <div class="reading">
+        <div class="kicker">Your reading</div>
+        <h4>Systems × Experience</h4>
+        <p>Your career shows a recurring movement from solving individual experience problems towards shaping larger systems. Your strongest evidence sits at the intersection of craft, strategy and influence.</p>
+        <h4>Emerging planet: AI</h4>
+        <p>AI appears as a growing dimension of your practice. The signal is strong enough to explore, but not yet a finished destination.</p>
+        <h4>Possible next chapter</h4>
+        <p>Design strategy, systems leadership or AI-enabled experience work are directions worth exploring further. The point is not to predict the answer, but to make the possibilities visible.</p>
+        <div><span class="tag">Craft</span><span class="tag">Systems</span><span class="tag">Strategy</span><span class="tag">AI</span><span class="tag">Influence</span></div>
+      </div>
+      <div class="final-cta">
+        <h3>Don't predict your future.<br>Explore it.</h3>
+        <p>You've seen the patterns. Wingspan helps you turn them into structured directions, gaps and next moves.</p>
+        <button class="cta" onclick="goWingspan()">Explore Wingspan →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="toast hidden" id="toast"></div>
+</div>
+<script>
+const state={name:"",place:"",dob:"",belief:null,file:null};
+function el(id){return document.getElementById(id)}
+function go(n){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.add("hidden"));
+  el("s"+n).classList.remove("hidden");
+  window.scrollTo({top:0,behavior:"instant"});
+}
+function toast(msg){const t=el("toast");t.textContent=msg;t.classList.remove("hidden");setTimeout(()=>t.classList.add("hidden"),1600)}
+function nextName(){const v=el("name").value.trim();if(!v){el("name").focus();return}state.name=v;go(2)}
+function nextPlace(){const v=el("place").value.trim();if(!v){el("place").focus();return}state.place=v;go(3)}
+function nextDob(){const v=el("dob").value;if(!v){el("dob").focus();return}state.dob=v;go(4);let p=0;const lines=["Mapping planets, houses and creative forces.","Finding patterns in the cosmic grid.","Aligning the career constellations.","Your Design Kundali is ready."];const timer=setInterval(()=>{p+=25;el("loadbar").style.width=p+"%";el("loadline").textContent=lines[Math.min(3,p/25-1)];if(p>=100){clearInterval(timer);setTimeout(()=>go(5),450)}},520)}
+function chooseBelief(v){state.belief=v;if(v){el("fake-title").textContent=(state.name?state.name+"'s":"Your")+" Design Kundali";el("fake-meta").textContent=(state.place?state.place+" · ":"")+"Career reading";go(6)}else showUpload("skeptic")}
+function fakeReaction(v){if(v)go(7);else showUpload("skeptic")}
+function showUpload(mode){if(mode==="skeptic"){el("upload-kicker").textContent="Fair enough.";el("upload-title").innerHTML="Let's look at<br>what you've built.";el("upload-copy").textContent="Skip the stars. Give me your career story and I'll create a Design Kundali from what you've actually done."}else{el("upload-kicker").textContent="Let's make it real.";el("upload-title").innerHTML="Show me<br>your hard work.";el("upload-copy").textContent="Upload your resume and I'll turn your actual career story into a Design Kundali."}go(8)}
+function resumePicked(input){const f=input.files[0];if(!f)return;state.file=f;el("filename").textContent="✓ "+f.name;el("generate").disabled=false;el("generate").style.opacity="1"}
+function generateReal(){if(!state.file)return;go(4);el("loadline").textContent="Reading your career story.";el("loadbar").style.width="20%";setTimeout(()=>{el("loadbar").style.width="55%";el("loadline").textContent="Finding patterns across your experience.";},500);setTimeout(()=>{el("loadbar").style.width="82%";el("loadline").textContent="Building your career constellation.";},1000);setTimeout(()=>{el("loadbar").style.width="100%";el("loadline").textContent="Your real Design Kundali is ready.";setTimeout(()=>{el("real-name").textContent=state.name||"Your career";el("real-file").textContent=state.file.name;el("real-meta").textContent=(state.place?state.place+" · ":"")+"Built from your career story";go(9)},550)},1500)}
+function luckEnd(){toast("The stars have spoken. ✦");setTimeout(()=>go(0),1000)}
+function goWingspan(){window.location.href="/"}
+["name","place"].forEach(id=>el(id).addEventListener("keydown",e=>{if(e.key==="Enter")id==="name"?nextName():nextPlace()}));
+</script>
+</body>
+</html>
