@@ -106,6 +106,7 @@ jobs:
               } catch(e) { return false; }
             }, null, { timeout: 180000 });
             const state=await page.evaluate(()=>JSON.parse(localStorage.getItem('lakshya.v2')));
+            console.log('LAKSHYA SOURCES', JSON.stringify(state.sources));
             expect(state.sources).toHaveLength(5);
             expect(state.sources.every(x=>x.ok)).toBeTruthy();
             expect(state.raw).toContain('Amit Kumar Tiwari');
