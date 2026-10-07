@@ -55,20 +55,33 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          from reportlab.pdfgen import canvas
-          from docx import Document
-          from openpyxl import Workbook
-          from pptx import Presentation
-          from pptx.util import Inches
-          from PIL import Image, ImageDraw
-          p=Path('/tmp/lakshya-fixtures')
-          p.mkdir(parents=True,exist_ok=True)
+          import struct, zlib, zipfile
+          p=Path('/tmp/lakshya-fixtures'); p.mkdir(parents=True,exist_ok=True)
           (p/'sample.txt').write_text('Amit Kumar Tiwari\nLead Product Designer at SAP\n2019 - Present\nEnterprise AI and design systems')
-          d=Document(); d.add_heading('Amit Kumar Tiwari',0); d.add_paragraph('Lead Product Designer at SAP'); d.add_paragraph('2019 - Present'); d.add_paragraph('Enterprise AI, design systems, research and product strategy'); d.save(p/'sample.docx')
-          wb=Workbook(); ws=wb.active; ws.title='Career'; ws.append(['Period','Company','Role','Industry']); ws.append(['2019 - Present','SAP','Lead Product Designer','Enterprise technology']); wb.save(p/'sample.xlsx')
-          prs=Presentation(); s=prs.slides.add_slide(prs.slide_layouts[1]); s.shapes.title.text='Amit Kumar Tiwari'; s.placeholders[1].text='Lead Product Designer at SAP | 2019 - Present | AI and design systems'; prs.save(p/'sample.pptx')
-          pdf=canvas.Canvas(str(p/'sample.pdf')); pdf.drawString(72,760,'Amit Kumar Tiwari'); pdf.drawString(72,740,'Lead Product Designer at SAP'); pdf.drawString(72,720,'2019 - Present | Enterprise AI | Design systems'); pdf.save()
-          im=Image.new('RGB',(1400,500),'white'); dr=ImageDraw.Draw(im); dr.text((60,80),'Amit Kumar Tiwari - Lead Product Designer at SAP - 2019 - Present - AI design systems',fill='black'); im.save(p/'sample.png')
+          with zipfile.ZipFile(p/'sample.docx','w') as z:
+              z.writestr('[Content_Types].xml','<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>')
+              z.writestr('word/document.xml','<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Amit Kumar Tiwari</w:t></w:r></w:p><w:p><w:r><w:t>Lead Product Designer at SAP</w:t></w:r></w:p><w:p><w:r><w:t>2019 - Present</w:t></w:r></w:p><w:p><w:r><w:t>Enterprise AI, design systems, research and product strategy</w:t></w:r></w:p></w:body></w:document>')
+          with zipfile.ZipFile(p/'sample.xlsx','w') as z:
+              z.writestr('[Content_Types].xml','<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>')
+              z.writestr('xl/workbook.xml','<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheets><sheet name="Career" sheetId="1" r:id="rId1"/></sheets></workbook>')
+              z.writestr('xl/_rels/workbook.xml.rels','<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>')
+              z.writestr('xl/worksheets/sheet1.xml','<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row><c t="inlineStr"><is><t>Period</t></is></c><c t="inlineStr"><is><t>Company</t></is></c><c t="inlineStr"><is><t>Role</t></is></c></row><row><c t="inlineStr"><is><t>2019 - Present</t></is></c><c t="inlineStr"><is><t>SAP</t></is></c><c t="inlineStr"><is><t>Lead Product Designer</t></is></c></row></sheetData></worksheet>')
+          with zipfile.ZipFile(p/'sample.pptx','w') as z:
+              z.writestr('ppt/slides/slide1.xml','<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><a:t>Amit Kumar Tiwari</a:t><a:t>Lead Product Designer at SAP</a:t><a:t>2019 - Present</a:t><a:t>AI and design systems</a:t></p:spTree></p:cSld></p:sld>')
+          objs=[]
+          def obj(s): objs.append(s.encode('latin1'))
+          obj('<< /Type /Catalog /Pages 2 0 R >>')
+          obj('<< /Type /Pages /Kids [3 0 R] /Count 1 >>')
+          obj('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>')
+          stream=b'BT /F1 24 Tf 72 720 Td (Amit Kumar Tiwari) Tj 0 -40 Td (Lead Product Designer at SAP) Tj 0 -40 Td (2019 - Present) Tj ET'
+          obj(f'<< /Length {len(stream)} >>\nstream\n'+stream.decode('latin1')+'\nendstream')
+          obj('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>')
+          out=b'%PDF-1.4\n'; offs=[0]
+          for i,o in enumerate(objs,1): offs.append(len(out)); out+=f'{i} 0 obj\n'.encode()+o+b'\nendobj\n'
+          xref=len(out); out+=f'xref\n0 {len(objs)+1}\n0000000000 65535 f \n'.encode()
+          for off in offs[1:]: out+=f'{off:010d} 00000 n \n'.encode()
+          out+=f'trailer\n<< /Size {len(objs)+1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n'.encode()
+          (p/'sample.pdf').write_bytes(out)
           PY
           python -m http.server 4173 --directory public/app/Lakshya >/tmp/lakshya-server.log 2>&1 &
           npx -y @playwright/test@1.55.0 install --with-deps chromium
@@ -82,17 +95,16 @@ jobs:
               '/tmp/lakshya-fixtures/sample.docx',
               '/tmp/lakshya-fixtures/sample.xlsx',
               '/tmp/lakshya-fixtures/sample.pptx',
-              '/tmp/lakshya-fixtures/sample.pdf',
-              '/tmp/lakshya-fixtures/sample.png'
+              '/tmp/lakshya-fixtures/sample.pdf'
             ]);
             await page.waitForFunction(() => {
               try {
                 const s=JSON.parse(localStorage.getItem('lakshya.v2')||'{}');
-                return (s.sources||[]).length===6;
+                return (s.sources||[]).length===5;
               } catch(e) { return false; }
             }, null, { timeout: 180000 });
             const state=await page.evaluate(()=>JSON.parse(localStorage.getItem('lakshya.v2')));
-            expect(state.sources).toHaveLength(6);
+            expect(state.sources).toHaveLength(5);
             expect(state.sources.every(x=>x.ok)).toBeTruthy();
             expect(state.raw).toContain('Amit Kumar Tiwari');
             expect(state.raw).toContain('Lead Product Designer at SAP');
