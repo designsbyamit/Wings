@@ -42,7 +42,13 @@ jobs:
           end = html.rfind('</script>')
           Path('/tmp/lakshya.js').write_text(html[start:end])
           PY
-          node --check /tmp/lakshya.js
+          node - <<'NODE'
+          const fs=require('fs');
+          const vm=require('vm');
+          const src=fs.readFileSync('/tmp/lakshya.js','utf8');
+          try { new vm.Script(src,{filename:'lakshya.js'}); }
+          catch(e) { console.error(e.stack); process.exit(1); }
+          NODE
 
 
       - name: Configure Pages
