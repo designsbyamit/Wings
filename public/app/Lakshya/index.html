@@ -68,6 +68,88 @@ async function handleFiles(list){
   }
   save(); draw();
 }
+function fileKind(f){
+  const n=(f.name||'').toLowerCase(), t=(f.type||'').toLowerCase();
+  if(t.startsWith('image/') || /\.(png|jpg|jpeg|webp|gif|bmp|tif|tiff)$/.test(n)) return 'image';
+  if(t==='application/pdf' || n.endsWith('.pdf')) return 'pdf';
+  if(t.includes('wordprocessingml') || n.endsWith('.docx')) return 'docx';
+  if(t.includes('presentationml') || n.endsWith('.pptx')) return 'pptx';
+  if(t.includes('spreadsheet') || t.includes('excel') || /\.(xlsx|xls|xlsb|ods)$/.test(n)) return 'spreadsheet';
+  if(t.includes('html') || t.includes('xml') || /\.(html?|xml)$/.test(n)) return 'html';
+  if(t.includes('rtf') || n.endsWith('.rtf')) return 'rtf';
+  if(t.startsWith('text/') || /\.(txt|md|markdown|csv|tsv|json)$/.test(n)) return 'text';
+  if(n.endsWith('.doc')) return 'doc';
+  return 'unknown';
+}
+function cleanText(s){
+  return String(s||'').replace(/\u0000/g,' ').replace(/\r/g,'').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').split('\n').map(x=>x.trim()).filter(Boolean).join('\n').trim();
+}
+function requireLib(name,obj){
+  if(!obj) throw new Error(name+' parser is unavailable. Please check your connection and try again.');
+}
+async function ocrImage(source,label){
+  requireLib('OCR',window.Tesseract);
+  setStatus('Reading <strong>'+esc(label)+'</strong> with OCR...');
+  const r=await Tesseract.recognize(source,'eng',{logger:m=>{
+    if(m.status==='recognizing text') setStatus('Reading <strong>'+esc(label)+'</strong> · '+Math.round((m.progress||0)*100)+'%');
+  }});
+  const text=cleanText(r&&r.data&&r.data.text);
+  if(!text) throw new Error('OCR completed but no readable text was found.');
+  return text;
+}
+async function parsePdf(f){
+  requireLib('PDF',window.pdfjsLib);
+  const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;
+  const pages=[];
+  for(let i=1;i<=pdf.numPages;i++){
+    setStatus('Reading <strong>'+esc(f.name)+'</strong> · page '+i+' of '+pdf.numPages+'...');
+    const page=await pdf.getPage(i), content=await page.getTextContent();
+    let text=cleanText(content.items.map(x=>x.str).join(' '));
+    if(text.length<35){
+      try{
+        const viewport=page.getViewport({scale:1.5}), canvas=document.createElement('canvas');
+        canvas.width=Math.ceil(viewport.width); canvas.height=Math.ceil(viewport.height);
+        await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+        const ocr=await ocrImage(canvas,'page '+i);
+        text=text?text+'\n'+ocr:ocr;
+      }catch(e){ if(!text) throw new Error('Page '+i+' has no selectable text and OCR failed: '+e.message); }
+    }
+    if(text) pages.push('PAGE '+i+'\n'+text);
+  }
+  const text=cleanText(pages.join('\n\n'));
+  if(!text) throw new Error('The PDF contains no readable text.');
+  return text;
+}
+async function parsePptx(f){
+  requireLib('PPTX',window.JSZip);
+  const zip=await JSZip.loadAsync(await f.arrayBuffer());
+  const names=Object.keys(zip.files).filter(n=>/^ppt\/slides\/slide\d+\.xml$/i.test(n)).sort((a,b)=>Number(a.match(/slide(\d+)/i)[1])-Number(b.match(/slide(\d+)/i)[1]));
+  if(!names.length) throw new Error('No presentation slides were found.');
+  const out=[];
+  for(let i=0;i<names.length;i++){
+    setStatus('Reading <strong>'+esc(f.name)+'</strong> · slide '+(i+1)+' of '+names.length+'...');
+    const xml=await zip.files[names[i]].async('text');
+    const doc=new DOMParser().parseFromString(xml,'application/xml');
+    const nodes=doc.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/main','t');
+    const texts=[...nodes].map(x=>x.textContent||'').filter(Boolean);
+    const slide=cleanText(texts.join(' '));
+    if(slide) out.push('SLIDE '+(i+1)+'\n'+slide);
+  }
+  const text=cleanText(out.join('\n\n'));
+  if(!text) throw new Error('The presentation contains no readable slide text.');
+  return text;
+}
+async function parseSpreadsheet(f){
+  requireLib('spreadsheet',window.XLSX);
+  const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true}), out=[];
+  for(const s of wb.SheetNames){
+    const csv=XLSX.utils.sheet_to_csv(wb.Sheets[s],{blankrows:false});
+    if(csv.trim()) out.push('SHEET: '+s+'\n'+csv);
+  }
+  const text=cleanText(out.join('\n\n'));
+  if(!text) throw new Error('The spreadsheet contains no readable cells.');
+  return text;
+}
 async function parseFile(f){
   const kind=fileKind(f);
   setStatus('Preparing <strong>'+esc(f.name)+'</strong>...');
