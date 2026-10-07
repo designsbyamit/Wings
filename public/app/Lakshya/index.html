@@ -6,6 +6,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://unpkg.com/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{--ink:#171613;--paper:#f4efe5;--card:#fffdf8;--muted:#766f66;--line:#ddd4c5;--saff:#d77932;--gold:#b89550;--teal:#357b76;--indigo:#58679b;--rose:#ad687d;--green:#39745c}
@@ -53,8 +54,127 @@ function evidence(){let files=state.sources.map(s=>'<span class="source">'+(s.ok
 function parsedTable(){if(!state.rows.length)return '<div class="table-wrap"><div class="note">The parser has not found enough structured career moments yet. Add a CV, case study or portfolio export with dates and role/company context.</div></div>';return '<div class="table-wrap"><table class="data-table"><thead><tr><th>Period</th><th>Company / org</th><th>Role signal</th><th>Application type</th><th>Industry</th><th>Evidence</th><th>Source</th></tr></thead><tbody>'+state.rows.map(r=>'<tr><td>'+esc(r.period||'Not detected')+'</td><td>'+esc(r.company)+'</td><td>'+esc(r.role)+'</td><td><span class="tag saff">'+esc(r.type)+'</span></td><td><span class="tag teal">'+esc(r.industry)+'</span></td><td>'+esc(r.evidence)+'</td><td><span class="tag indigo">'+esc(r.source)+'</span></td></tr>').join('')+'</tbody></table></div>'}
 async function addUrl(){let u=document.getElementById('urlInput')?.value.trim();if(!u)return;setStatus('Opening the portfolio and reading its visible content...');try{let r=await fetch('https://r.jina.ai/'+u);if(!r.ok)throw Error('fetch');let text=await r.text();ingest({name:u.replace(/^https?:\/\//,''),type:'Portfolio link',text,ok:true})}catch(e){state.sources.push({name:u,type:'Portfolio link',chars:0,ok:false});setStatus('This portfolio could not be read automatically. Keep the link as a source and continue with a file export of the portfolio.')}save();draw()}
 async function handleFiles(list){for(const f of list){setStatus('Parsing <strong>'+esc(f.name)+'</strong>...');try{let r=await parseFile(f);ingest({name:f.name,type:r.type,text:r.text,ok:true})}catch(e){state.sources.push({name:f.name,type:f.type,chars:0,ok:false});setStatus('Could not parse '+esc(f.name)+'. The source is retained.')}}save();draw()}
-async function parseFile(f){let n=f.name.toLowerCase();if(f.type.startsWith('image/')||/\.(png|jpg|jpeg|webp|gif|bmp|tiff)$/i.test(n)){let r=await Tesseract.recognize(f,'eng',{logger:m=>{if(m.status==='recognizing text')setStatus('Reading image... '+Math.round((m.progress||0)*100)+'%')}});return{type:'Image / OCR',text:r.data.text}}if(n.endsWith('.pdf')){let p=await pdfjsLib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise,o=[];for(let i=1;i<=p.numPages;i++){let q=await p.getPage(i),c=await q.getTextContent();o.push(c.items.map(x=>x.str).join(' '))}return{type:'PDF',text:o.join('\n')}}if(n.endsWith('.docx'))return{type:'DOCX',text:(await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()})).value};if(n.endsWith('.xlsx')||n.endsWith('.xls')){let w=XLSX.read(await f.arrayBuffer(),{type:'array'}),o=[];for(let s of w.SheetNames)o.push('SHEET: '+s+'\n'+XLSX.utils.sheet_to_csv(w.Sheets[s]));return{type:'Spreadsheet',text:o.join('\n')}}if(n.endsWith('.pptx')){let w=XLSX.read(await f.arrayBuffer(),{type:'array'});return{type:'PPTX',text:JSON.stringify(w.Sheets||{})}}return{type:'Text',text:await f.text()}}
-function ingest(s){state.sources.push({name:s.name,type:s.type,chars:s.text.length,ok:true});state.raw+=(state.raw?'\n\n':'')+'===== '+s.name+' =====\n'+s.text;extract(s.text,s.name)}
+function fileKind(f){
+  const n=(f.name||'').toLowerCase(), t=(f.type||'').toLowerCase();
+  if(t.startsWith('image/') || /\.(png|jpg|jpeg|webp|gif|bmp|tif|tiff)$/.test(n)) return 'image';
+  if(t==='application/pdf' || n.endsWith('.pdf')) return 'pdf';
+  if(t.includes('wordprocessingml') || n.endsWith('.docx')) return 'docx';
+  if(t.includes('presentationml') || n.endsWith('.pptx')) return 'pptx';
+  if(t.includes('spreadsheet') || t.includes('excel') || /\.(xlsx|xls|xlsb|ods)$/.test(n)) return 'spreadsheet';
+  if(t.includes('html') || t.includes('xml') || /\.(html?|xml)$/.test(n)) return 'html';
+  if(t.includes('rtf') || n.endsWith('.rtf')) return 'rtf';
+  if(t.startsWith('text/') || /\.(txt|md|markdown|csv|tsv|json)$/.test(n)) return 'text';
+  if(n.endsWith('.doc')) return 'doc';
+  return 'unknown';
+}
+function cleanText(s){
+  return String(s||'').replace(/\u0000/g,' ').replace(/\r/g,'').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').split('\n').map(x=>x.trim()).filter(Boolean).join('\n').trim();
+}
+function requireLib(name,obj){
+  if(!obj) throw new Error(name+' parser is unavailable. Please check your connection and try again.');
+}
+async function ocrImage(source,label){
+  requireLib('OCR',window.Tesseract);
+  setStatus('Reading <strong>'+esc(label)+'</strong> with OCR...');
+  const r=await Tesseract.recognize(source,'eng',{logger:m=>{
+    if(m.status==='recognizing text') setStatus('Reading <strong>'+esc(label)+'</strong> · '+Math.round((m.progress||0)*100)+'%');
+  }});
+  const text=cleanText(r&&r.data&&r.data.text);
+  if(!text) throw new Error('OCR completed but no readable text was found.');
+  return text;
+}
+async function parsePdf(f){
+  requireLib('PDF',window.pdfjsLib);
+  const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;
+  const pages=[];
+  for(let i=1;i<=pdf.numPages;i++){
+    setStatus('Reading <strong>'+esc(f.name)+'</strong> · page '+i+' of '+pdf.numPages+'...');
+    const page=await pdf.getPage(i), content=await page.getTextContent();
+    let text=cleanText(content.items.map(x=>x.str).join(' '));
+    if(text.length<35){
+      try{
+        const viewport=page.getViewport({scale:1.5}), canvas=document.createElement('canvas');
+        canvas.width=Math.ceil(viewport.width); canvas.height=Math.ceil(viewport.height);
+        await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+        const ocr=await ocrImage(canvas,'page '+i);
+        text=text?text+'\n'+ocr:ocr;
+      }catch(e){ if(!text) throw new Error('Page '+i+' has no selectable text and OCR failed: '+e.message); }
+    }
+    if(text) pages.push('PAGE '+i+'\n'+text);
+  }
+  const text=cleanText(pages.join('\n\n'));
+  if(!text) throw new Error('The PDF contains no readable text.');
+  return text;
+}
+async function parsePptx(f){
+  requireLib('PPTX',window.JSZip);
+  const zip=await JSZip.loadAsync(await f.arrayBuffer());
+  const names=Object.keys(zip.files).filter(n=>/^ppt\/slides\/slide\d+\.xml$/i.test(n)).sort((a,b)=>Number(a.match(/slide(\d+)/i)[1])-Number(b.match(/slide(\d+)/i)[1]));
+  if(!names.length) throw new Error('No presentation slides were found.');
+  const out=[];
+  for(let i=0;i<names.length;i++){
+    setStatus('Reading <strong>'+esc(f.name)+'</strong> · slide '+(i+1)+' of '+names.length+'...');
+    const xml=await zip.files[names[i]].async('text');
+    const doc=new DOMParser().parseFromString(xml,'application/xml');
+    const nodes=doc.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/main','t');
+    const texts=[...nodes].map(x=>x.textContent||'').filter(Boolean);
+    const slide=cleanText(texts.join(' '));
+    if(slide) out.push('SLIDE '+(i+1)+'\n'+slide);
+  }
+  const text=cleanText(out.join('\n\n'));
+  if(!text) throw new Error('The presentation contains no readable slide text.');
+  return text;
+}
+async function parseSpreadsheet(f){
+  requireLib('spreadsheet',window.XLSX);
+  const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true}), out=[];
+  for(const s of wb.SheetNames){
+    const csv=XLSX.utils.sheet_to_csv(wb.Sheets[s],{blankrows:false});
+    if(csv.trim()) out.push('SHEET: '+s+'\n'+csv);
+  }
+  const text=cleanText(out.join('\n\n'));
+  if(!text) throw new Error('The spreadsheet contains no readable cells.');
+  return text;
+}
+async function parseFile(f){
+  const kind=fileKind(f);
+  setStatus('Preparing <strong>'+esc(f.name)+'</strong>...');
+  if(kind==='image') return {type:'Image / OCR',text:await ocrImage(f,f.name)};
+  if(kind==='pdf') return {type:'PDF',text:await parsePdf(f)};
+  if(kind==='docx'){
+    requireLib('DOCX',window.mammoth);
+    const r=await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()}), text=cleanText(r.value);
+    if(!text) throw new Error('The DOCX contains no readable text.');
+    return {type:'DOCX',text};
+  }
+  if(kind==='pptx') return {type:'PPTX',text:await parsePptx(f)};
+  if(kind==='spreadsheet') return {type:'Spreadsheet',text:await parseSpreadsheet(f)};
+  if(kind==='html'){
+    const raw=await f.text(), doc=new DOMParser().parseFromString(raw,'text/html');
+    const text=cleanText((doc.body&&doc.body.innerText)||doc.documentElement.textContent||'');
+    if(!text) throw new Error('The HTML/XML file contains no readable text.');
+    return {type:'Document / HTML',text};
+  }
+  if(kind==='rtf'){
+    const raw=await f.text(), text=cleanText(raw.replace(/\\par[d]?/gi,'\n').replace(/\\'[0-9a-f]{2}/gi,' ').replace(/\\[a-z]+\d* ?/gi,'').replace(/[{}]/g,''));
+    if(!text) throw new Error('The RTF contains no readable text.');
+    return {type:'RTF',text};
+  }
+  if(kind==='text'){
+    const text=cleanText(await f.text());
+    if(!text) throw new Error('The file is empty.');
+    return {type:'Text',text};
+  }
+  if(kind==='doc') throw new Error('Legacy .doc files are not supported in-browser. Save it as .docx or PDF and upload again.');
+  throw new Error('This file format is not supported. Use PDF, DOCX, PPTX, XLSX, CSV, TXT, Markdown, JSON, RTF, HTML or an image.');
+}
+function ingest(s){
+  const text=cleanText(s.text);
+  if(!text) throw new Error('No readable text was extracted from '+s.name+'.');
+  state.sources.push({name:s.name,type:s.type,chars:text.length,ok:true});
+  state.raw+=(state.raw?'\n\n':'')+'===== '+s.name+' =====\n'+text;
+  extract(text,s.name);
+}
 function detectSkill(text){let low=text.toLowerCase(),map={hard:{'Interaction design':['interaction design','ux design','interaction designer'],'Research':['user research','usability','user testing','interviews','research'],'Prototyping':['prototype','prototyping','wireframe'],'Design systems':['design system','component library','tokens'],'Visual design':['visual design','visual designer','visual identity'],'Product strategy':['product strategy','product vision','roadmap','product thinking'],'Service design':['service design','service blueprint'],'AI interaction design':['generative ai','artificial intelligence','conversational','copilot','agentic','machine learning'],'Information architecture':['information architecture'],'Accessibility':['accessibility','wcag'],'Content design':['content design','content strategy'],'Motion design':['motion design','animation','micro-interaction'],'Data visualisation':['data visualization','data visualisation','dashboard']},soft:{'Strategic thinking':['strategic','strategy'],'Facilitation':['facilitat','workshop','co-creation'],'Storytelling':['storytell','narrative','presentation'],'Leadership':['led','lead','managed','management','mentor'],'Collaboration':['collaborat','cross-functional','partnered'],'Communication':['communicat','presented'],'Mentoring':['mentor','coaching'],'Stakeholder management':['stakeholder','executive'],'Systems thinking':['systems thinking'],'Judgement':['judgement','judgment','decision-making'],'Negotiation':['negotiat']}};return map}
 function extract(text,source){let m=detectSkill(text);for(let type of ['hard','soft'])for(let [skill,terms] of Object.entries(m[type]))if(terms.some(t=>text.toLowerCase().includes(t))&&!state.skills[type].includes(skill))state.skills[type].push(skill);let lines=text.split(/\n+/).map(x=>x.replace(/\s+/g,' ').trim()).filter(x=>x.length>18);let date=/((19|20)\d{2})\s*(?:-|–|to)\s*((19|20)\d{2}|present|current)/i;let roles=/\b(designer|design|ux|product|research|manager|lead|director|consultant|architect|engineer|founder|head|strategist)\b/i;let companyish=/\b(?:at|@|with)\s+([A-Z][A-Za-z0-9& ._-]{2,50})/;for(let line of lines){if(state.rows.length>=40)break;let d=line.match(date),c=line.match(companyish),r=line.match(roles);if(d||c||r){let period=d?d[0]:'';let role=r?line.match(new RegExp('.{0,35}'+r[0]+'.{0,35}','i'))?.[0]||'':'';let company=c?c[1].trim():'';let type=/b2b|enterprise|saas|internal|platform/i.test(line)?'B2B / Enterprise':/b2c|consumer|retail|customer/i.test(line)?'B2C / Consumer':'Product / Digital';let industry=/finance|bank|fintech/i.test(line)?'Financial services':/health|hospital|medical/i.test(line)?'Healthcare':/retail|commerce|ecommerce/i.test(line)?'Retail / Commerce':/manufact|industrial/i.test(line)?'Manufacturing':/education|learning|school/i.test(line)?'Education':'Technology / Services';if((d||c)&&!state.rows.some(x=>x.evidence===line.slice(0,180)))state.rows.push({period,company:company||'Detected from evidence',role:role||'Role signal',type,industry,evidence:line.slice(0,180),source})}}}
 function status(m){setStatus(m)}function setStatus(m){let x=document.getElementById('status');if(x)x.innerHTML=m}
