@@ -87,7 +87,7 @@ jobs:
           npx -y @playwright/test@1.55.0 install --with-deps chromium
           mkdir -p /tmp/lakshya-tests
           cat >/tmp/lakshya-tests/lakshya-parser.spec.js <<'JS'
-          const { test, expect } = require('@playwright/test');
+          const { test, expect } = require('playwright/test');
           test('parses common evidence formats end to end', async ({ page }) => {
             await page.goto('http://127.0.0.1:4173/index.html', { waitUntil: 'networkidle', timeout: 60000 });
             await expect(page.locator('h1')).toContainText('Career');
