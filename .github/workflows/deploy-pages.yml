@@ -112,7 +112,10 @@ jobs:
             await expect(page.locator('.stats .num').nth(1)).toContainText(String(state.rows.length));
           });
           JS
-          npx -y @playwright/test@1.55.0 test /tmp/lakshya-parser.spec.js --workers=1 --reporter=line
+          cat >/tmp/playwright.config.js <<'JS'
+          module.exports={testDir:'/tmp',testMatch:'lakshya-parser.spec.js',use:{browserName:'chromium'}};
+          JS
+          npx -y @playwright/test@1.55.0 test --config=/tmp/playwright.config.js --workers=1 --reporter=line
           cat /tmp/lakshya-server.log
           
       - name: Configure Pages
