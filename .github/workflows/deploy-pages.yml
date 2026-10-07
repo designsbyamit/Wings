@@ -84,6 +84,7 @@ jobs:
           (p/'sample.pdf').write_bytes(out)
           PY
           python -m http.server 4173 --directory public/app/Lakshya >/tmp/lakshya-server.log 2>&1 &
+          npm install --no-save @playwright/test@1.55.0
           npx -y @playwright/test@1.55.0 install --with-deps chromium
           mkdir -p /tmp/lakshya-tests
           cat >/tmp/lakshya-tests/lakshya-parser.spec.js <<'JS'
@@ -116,7 +117,7 @@ jobs:
           cat >/tmp/playwright.config.js <<'JS'
           module.exports={testDir:'/tmp/lakshya-tests',testMatch:'lakshya-parser.spec.js',use:{browserName:'chromium'}};
           JS
-          npx -y @playwright/test@1.55.0 test --config=/tmp/playwright.config.js --workers=1 --reporter=line
+          NODE_PATH="$GITHUB_WORKSPACE/node_modules" npx -y @playwright/test@1.55.0 test --config=/tmp/playwright.config.js --workers=1 --reporter=line
           cat /tmp/lakshya-server.log
           
       - name: Configure Pages
