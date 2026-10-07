@@ -53,88 +53,20 @@ function home(){return '<section class="hero scene"><div><div class="eyebrow">TH
 function evidence(){let files=state.sources.map(s=>'<span class="source">'+(s.ok?'✓':'!')+' '+esc(s.name)+'</span>').join('');return shell('01 · YOUR EVIDENCE','Give the lab your career story.','Upload one or many files, or paste a public portfolio link. The lab will parse the material, find evidence, and turn it into a structured career record.','<div class="drop"><h3>Drop your evidence here.</h3><p class="muted">PDF, DOCX, PPTX, XLSX, CSV, TXT, Markdown, JSON, images and more.</p><input id="fileInput" type="file" multiple><label for="fileInput">Choose files</label><div class="urlrow"><input id="urlInput" placeholder="https://yourportfolio.com"><button class="action secondary" onclick="addUrl()">Add portfolio link</button></div><div id="status" class="status"></div><div class="source-list">'+files+'</div></div><div class="stats"><div class="card"><div class="eyebrow">SOURCES</div><div class="num">'+state.sources.length+'</div><div class="muted">provided</div></div><div class="card"><div class="eyebrow">CAREER RECORD</div><div class="num">'+state.rows.length+'</div><div class="muted">signals structured</div></div><div class="card"><div class="eyebrow">SKILLS</div><div class="num">'+(state.skills.hard.length+state.skills.soft.length)+'</div><div class="muted">signals detected</div></div><div class="card"><div class="eyebrow">EVIDENCE</div><div class="num">'+Math.round(state.raw.length/1000)+'</div><div class="muted">k characters read</div></div></div><div class="note"><strong>The parsing is evidence-first.</strong> It does not decide your future. It surfaces what your work actually says about you.</div><div class="section-head"><div><div class="eyebrow">PARSED CAREER RECORD</div><h3>This is what the lab found.</h3></div><span class="muted">Structured from your evidence.</span></div>'+parsedTable()+'')}
 function parsedTable(){if(!state.rows.length)return '<div class="table-wrap"><div class="note">The parser has not found enough structured career moments yet. Add a CV, case study or portfolio export with dates and role/company context.</div></div>';return '<div class="table-wrap"><table class="data-table"><thead><tr><th>Period</th><th>Company / org</th><th>Role signal</th><th>Application type</th><th>Industry</th><th>Evidence</th><th>Source</th></tr></thead><tbody>'+state.rows.map(r=>'<tr><td>'+esc(r.period||'Not detected')+'</td><td>'+esc(r.company)+'</td><td>'+esc(r.role)+'</td><td><span class="tag saff">'+esc(r.type)+'</span></td><td><span class="tag teal">'+esc(r.industry)+'</span></td><td>'+esc(r.evidence)+'</td><td><span class="tag indigo">'+esc(r.source)+'</span></td></tr>').join('')+'</tbody></table></div>'}
 async function addUrl(){let u=document.getElementById('urlInput')?.value.trim();if(!u)return;setStatus('Opening the portfolio and reading its visible content...');try{let r=await fetch('https://r.jina.ai/'+u);if(!r.ok)throw Error('fetch');let text=await r.text();ingest({name:u.replace(/^https?:\/\//,''),type:'Portfolio link',text,ok:true})}catch(e){state.sources.push({name:u,type:'Portfolio link',chars:0,ok:false});setStatus('This portfolio could not be read automatically. Keep the link as a source and continue with a file export of the portfolio.')}save();draw()}
-async function handleFiles(list){for(const f of list){setStatus('Parsing <strong>'+esc(f.name)+'</strong>...');try{let r=await parseFile(f);ingest({name:f.name,type:r.type,text:r.text,ok:true})}catch(e){state.sources.push({name:f.name,type:f.type,chars:0,ok:false});setStatus('Could not parse '+esc(f.name)+'. The source is retained.')}}save();draw()}
-function fileKind(f){
-  const n=(f.name||'').toLowerCase(), t=(f.type||'').toLowerCase();
-  if(t.startsWith('image/') || /\.(png|jpg|jpeg|webp|gif|bmp|tif|tiff)$/.test(n)) return 'image';
-  if(t==='application/pdf' || n.endsWith('.pdf')) return 'pdf';
-  if(t.includes('wordprocessingml') || n.endsWith('.docx')) return 'docx';
-  if(t.includes('presentationml') || n.endsWith('.pptx')) return 'pptx';
-  if(t.includes('spreadsheet') || t.includes('excel') || /\.(xlsx|xls|xlsb|ods)$/.test(n)) return 'spreadsheet';
-  if(t.includes('html') || t.includes('xml') || /\.(html?|xml)$/.test(n)) return 'html';
-  if(t.includes('rtf') || n.endsWith('.rtf')) return 'rtf';
-  if(t.startsWith('text/') || /\.(txt|md|markdown|csv|tsv|json)$/.test(n)) return 'text';
-  if(n.endsWith('.doc')) return 'doc';
-  return 'unknown';
-}
-function cleanText(s){
-  return String(s||'').replace(/\u0000/g,' ').replace(/\r/g,'').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').split('\n').map(x=>x.trim()).filter(Boolean).join('\n').trim();
-}
-function requireLib(name,obj){
-  if(!obj) throw new Error(name+' parser is unavailable. Please check your connection and try again.');
-}
-async function ocrImage(source,label){
-  requireLib('OCR',window.Tesseract);
-  setStatus('Reading <strong>'+esc(label)+'</strong> with OCR...');
-  const r=await Tesseract.recognize(source,'eng',{logger:m=>{
-    if(m.status==='recognizing text') setStatus('Reading <strong>'+esc(label)+'</strong> · '+Math.round((m.progress||0)*100)+'%');
-  }});
-  const text=cleanText(r&&r.data&&r.data.text);
-  if(!text) throw new Error('OCR completed but no readable text was found.');
-  return text;
-}
-async function parsePdf(f){
-  requireLib('PDF',window.pdfjsLib);
-  const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;
-  const pages=[];
-  for(let i=1;i<=pdf.numPages;i++){
-    setStatus('Reading <strong>'+esc(f.name)+'</strong> · page '+i+' of '+pdf.numPages+'...');
-    const page=await pdf.getPage(i), content=await page.getTextContent();
-    let text=cleanText(content.items.map(x=>x.str).join(' '));
-    if(text.length<35){
-      try{
-        const viewport=page.getViewport({scale:1.5}), canvas=document.createElement('canvas');
-        canvas.width=Math.ceil(viewport.width); canvas.height=Math.ceil(viewport.height);
-        await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
-        const ocr=await ocrImage(canvas,'page '+i);
-        text=text?text+'\n'+ocr:ocr;
-      }catch(e){ if(!text) throw new Error('Page '+i+' has no selectable text and OCR failed: '+e.message); }
+async function handleFiles(list){
+  for(const f of list){
+    setStatus('Parsing <strong>'+esc(f.name)+'</strong>...');
+    try{
+      const r=await parseFile(f);
+      ingest({name:f.name,type:r.type,text:r.text,ok:true});
+      setStatus('<strong>'+esc(f.name)+'</strong> parsed successfully.');
+    }catch(e){
+      console.error('Lakshya parser error',f.name,e);
+      state.sources.push({name:f.name,type:f.type||'Unknown',chars:0,ok:false,error:e.message});
+      setStatus('<strong>'+esc(f.name)+'</strong> could not be parsed. '+esc(e.message));
     }
-    if(text) pages.push('PAGE '+i+'\n'+text);
   }
-  const text=cleanText(pages.join('\n\n'));
-  if(!text) throw new Error('The PDF contains no readable text.');
-  return text;
-}
-async function parsePptx(f){
-  requireLib('PPTX',window.JSZip);
-  const zip=await JSZip.loadAsync(await f.arrayBuffer());
-  const names=Object.keys(zip.files).filter(n=>/^ppt\/slides\/slide\d+\.xml$/i.test(n)).sort((a,b)=>Number(a.match(/slide(\d+)/i)[1])-Number(b.match(/slide(\d+)/i)[1]));
-  if(!names.length) throw new Error('No presentation slides were found.');
-  const out=[];
-  for(let i=0;i<names.length;i++){
-    setStatus('Reading <strong>'+esc(f.name)+'</strong> · slide '+(i+1)+' of '+names.length+'...');
-    const xml=await zip.files[names[i]].async('text');
-    const doc=new DOMParser().parseFromString(xml,'application/xml');
-    const nodes=doc.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/main','t');
-    const texts=[...nodes].map(x=>x.textContent||'').filter(Boolean);
-    const slide=cleanText(texts.join(' '));
-    if(slide) out.push('SLIDE '+(i+1)+'\n'+slide);
-  }
-  const text=cleanText(out.join('\n\n'));
-  if(!text) throw new Error('The presentation contains no readable slide text.');
-  return text;
-}
-async function parseSpreadsheet(f){
-  requireLib('spreadsheet',window.XLSX);
-  const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true}), out=[];
-  for(const s of wb.SheetNames){
-    const csv=XLSX.utils.sheet_to_csv(wb.Sheets[s],{blankrows:false});
-    if(csv.trim()) out.push('SHEET: '+s+'\n'+csv);
-  }
-  const text=cleanText(out.join('\n\n'));
-  if(!text) throw new Error('The spreadsheet contains no readable cells.');
-  return text;
+  save(); draw();
 }
 async function parseFile(f){
   const kind=fileKind(f);
