@@ -88,16 +88,16 @@ function skillEditor(type,list){
     let key=type+'|'+x;
     let v=state.strength[key]||Math.max(55,88-i*5);
     let rec=i<Math.min(3,list.length);
-    let safeKey=key.replace(/'/g,"\\'");
-    let safeX=x.replace(/'/g,"\\'");
-    return '<div class="strength-row"><span>'+esc(x)+(rec?' <span title="evidence-backed">•</span>':'')+'</span><input type="range" min="1" max="100" value="'+v+'" oninput="setStrength(\\''+safeKey+'\\',this.value)"><b>'+v+'</b><button class="back" title="Remove" onclick="removeSkill(\\''+type+'\\',\\''+safeX+'\\','+rec+')">×</button></div>';
+    return '<div class="strength-row"><span>'+esc(x)+(rec?' <span title="evidence-backed">•</span>':'')+'</span><input type="range" min="1" max="100" value="'+v+'" oninput="setStrengthIndex(\\''+type+'\\','+i+',this.value)"><b>'+v+'</b><button class="back" title="Remove" onclick="removeSkillIndex(\\''+type+'\\','+i+','+rec+')">×</button></div>';
   }).join('');
-  let catalog=(type==='hard'?hardCatalog:softCatalog).filter(x=>!list.includes(x)).slice(0,7).map(x=>{
-    let safe=x.replace(/'/g,"\\'");
-    return '<button class="capsule" onclick="addSkill(\\''+type+'\\',\\''+safe+'\\')">+ '+x+'</button>';
+  let catalog=(type==='hard'?hardCatalog:softCatalog).filter(x=>!list.includes(x)).slice(0,7).map((x,i)=>{
+    return '<button class="capsule" onclick="addCatalogSkill(\\''+type+'\\','+JSON.stringify(x)+')">+ '+x+'</button>';
   }).join('');
   return rows+'<div class="capsules">'+catalog+'</div>';
 }
+function setStrengthIndex(type,i,v){let list=state.skills[type].length?state.skills[type]:(type==='hard'?hardCatalog.slice(0,6):softCatalog.slice(0,6));let key=type+'|'+list[i];state.strength[key]=+v;save();event.target.parentElement.querySelector('b').textContent=v}
+function removeSkillIndex(type,i,locked){let list=state.skills[type].length?state.skills[type]:(type==='hard'?hardCatalog.slice(0,6):softCatalog.slice(0,6));let x=list[i];removeSkill(type,x,locked)}
+function addCatalogSkill(type,x){if(!state.skills[type].includes(x))state.skills[type].push(x);save();draw()}
 function setStrength(k,v){state.strength[k]=+v;save();event.target.parentElement.querySelector('b').textContent=v}
 function addSkill(t,x){if(!state.skills[t].includes(x))state.skills[t].push(x);save();draw()}
 function removeSkill(t,x,locked){if(locked&&!confirm('This skill was strongly supported by your evidence. Remove it anyway?'))return;state.skills[t]=state.skills[t].filter(s=>s!==x);delete state.strength[t+'|'+x];save();draw()}
