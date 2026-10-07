@@ -92,6 +92,8 @@ jobs:
           test('parses common evidence formats end to end', async ({ page }) => {
             await page.goto('http://127.0.0.1:4173/index.html', { waitUntil: 'networkidle', timeout: 60000 });
             await expect(page.locator('h1')).toContainText('Career');
+            page.on('pageerror', e => console.log('PAGEERROR', e.message));
+            console.log('PARSER GLOBALS', await page.evaluate(() => ({ fileKind: typeof fileKind, parseFile: typeof parseFile, hasSource: document.documentElement.innerHTML.includes('function fileKind') })));
             await page.locator('#fileInput').setInputFiles([
               '/tmp/lakshya-fixtures/sample.txt',
               '/tmp/lakshya-fixtures/sample.docx',
