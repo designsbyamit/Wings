@@ -51,6 +51,58 @@ jobs:
           NODE
 
 
+      - name: Browser test Lakshya document parsing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from reportlab.pdfgen import canvas
+          from docx import Document
+          from openpyxl import Workbook
+          from pptx import Presentation
+          from pptx.util import Inches
+          from PIL import Image, ImageDraw
+          p=Path('/tmp/lakshya-fixtures')
+          p.mkdir(parents=True,exist_ok=True)
+          (p/'sample.txt').write_text('Amit Kumar Tiwari\nLead Product Designer at SAP\n2019 - Present\nEnterprise AI and design systems')
+          d=Document(); d.add_heading('Amit Kumar Tiwari',0); d.add_paragraph('Lead Product Designer at SAP'); d.add_paragraph('2019 - Present'); d.add_paragraph('Enterprise AI, design systems, research and product strategy'); d.save(p/'sample.docx')
+          wb=Workbook(); ws=wb.active; ws.title='Career'; ws.append(['Period','Company','Role','Industry']); ws.append(['2019 - Present','SAP','Lead Product Designer','Enterprise technology']); wb.save(p/'sample.xlsx')
+          prs=Presentation(); s=prs.slides.add_slide(prs.slide_layouts[1]); s.shapes.title.text='Amit Kumar Tiwari'; s.placeholders[1].text='Lead Product Designer at SAP | 2019 - Present | AI and design systems'; prs.save(p/'sample.pptx')
+          pdf=canvas.Canvas(str(p/'sample.pdf')); pdf.drawString(72,760,'Amit Kumar Tiwari'); pdf.drawString(72,740,'Lead Product Designer at SAP'); pdf.drawString(72,720,'2019 - Present | Enterprise AI | Design systems'); pdf.save()
+          im=Image.new('RGB',(1400,500),'white'); dr=ImageDraw.Draw(im); dr.text((60,80),'Amit Kumar Tiwari - Lead Product Designer at SAP - 2019 - Present - AI design systems',fill='black'); im.save(p/'sample.png')
+          PY
+          python -m http.server 4173 --directory public/app/Lakshya >/tmp/lakshya-server.log 2>&1 &
+          npx -y @playwright/test@1.55.0 install --with-deps chromium
+          cat >/tmp/lakshya-parser.spec.js <<'JS'
+          const { test, expect } = require('@playwright/test');
+          test('parses common evidence formats end to end', async ({ page }) => {
+            await page.goto('http://127.0.0.1:4173/index.html', { waitUntil: 'networkidle', timeout: 60000 });
+            await expect(page.locator('h1')).toContainText('Career');
+            await page.locator('#fileInput').setInputFiles([
+              '/tmp/lakshya-fixtures/sample.txt',
+              '/tmp/lakshya-fixtures/sample.docx',
+              '/tmp/lakshya-fixtures/sample.xlsx',
+              '/tmp/lakshya-fixtures/sample.pptx',
+              '/tmp/lakshya-fixtures/sample.pdf',
+              '/tmp/lakshya-fixtures/sample.png'
+            ]);
+            await page.waitForFunction(() => {
+              try {
+                const s=JSON.parse(localStorage.getItem('lakshya.v2')||'{}');
+                return (s.sources||[]).length===6;
+              } catch(e) { return false; }
+            }, null, { timeout: 180000 });
+            const state=await page.evaluate(()=>JSON.parse(localStorage.getItem('lakshya.v2')));
+            expect(state.sources).toHaveLength(6);
+            expect(state.sources.every(x=>x.ok)).toBeTruthy();
+            expect(state.raw).toContain('Amit Kumar Tiwari');
+            expect(state.raw).toContain('Lead Product Designer at SAP');
+            expect(state.rows.length).toBeGreaterThan(0);
+            await expect(page.locator('.stats .num').nth(1)).toContainText(String(state.rows.length));
+          });
+          JS
+          npx -y @playwright/test@1.55.0 test /tmp/lakshya-parser.spec.js --workers=1 --reporter=line
+          cat /tmp/lakshya-server.log
+          
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
