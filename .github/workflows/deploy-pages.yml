@@ -86,7 +86,7 @@ jobs:
           python -m http.server 4173 --directory public/app/Lakshya >/tmp/lakshya-server.log 2>&1 &
           npx -y @playwright/test@1.55.0 install --with-deps chromium
           mkdir -p /tmp/lakshya-tests
-          cat >/tmp/lakshya-tests/lakshya-parser.spec.js <<'JS
+          cat >/tmp/lakshya-tests/lakshya-parser.spec.js <<'JS'
           const { test, expect } = require('@playwright/test');
           test('parses common evidence formats end to end', async ({ page }) => {
             await page.goto('http://127.0.0.1:4173/index.html', { waitUntil: 'networkidle', timeout: 60000 });
