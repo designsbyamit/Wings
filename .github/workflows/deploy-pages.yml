@@ -32,6 +32,18 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Validate Lakshya JavaScript
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          html = Path('public/app/Lakshya/index.html').read_text()
+          scripts = re.findall(r'<script>(.*?)</script>', html, re.S)
+          Path('/tmp/lakshya.js').write_text(scripts[-1])
+          PY
+          node --check /tmp/lakshya.js
+
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
